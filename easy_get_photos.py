@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 import time
 import urllib
 import re
+import os
 
 __author__ = 'zoom'
 
@@ -25,6 +26,7 @@ def get_all_articles():
     #分析总页数
     page_nums = soup.find_all('a', {'class': 'page-numbers'})
     page_max = int(page_nums[-2].get_text().strip())
+    page_max = 1
     print(page_max)
     article_list = list()
     for page_index in range(page_max):
@@ -34,6 +36,7 @@ def get_all_articles():
         post_list = soup.find_all('div', {'class': 'pin-coat'})
         [article_list.append(post.a.get('href')) for post in post_list]
         # time.sleep(2000)
+        print('Colloceting article url - [%d / %d Page]' % (page_index+1, page_max))
 
     return article_list
 
@@ -64,19 +67,68 @@ def download_photos(photo, path=None):
     :param path:本地，默认当前路径下jdly文件夹
     :return:
     """
-    photo_name = re.findall(r'\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}.jpg', photo)[0]
+    print('Photo url is ' + photo)
+    # photo_name = re.findall(r'\\(.*)$', photo)[0]
     # photo_name = re.findall(r'\(*.jpg)', photo)[0]
-    local_path = 'E:\\workspace\\github\\JdlySpider\\jdly_pic\\' + photo_name
-    urllib.request.urlretrieve(photo, local_path)
+    photo_name = photo.split('/')[-1]
+
+    local_path = os.path.dirname(os.path.realpath(__file__)) + '\\jdly\\' + photo_name
+    if not os.path.exists(local_path):
+        urllib.request.urlretrieve(photo, local_path)
+        print('Download : [%s] is done' % local_path)
     pass
 
 
-if __name__ == '__main__':
-    # articles = get_all_articles()
-    # get_photos_by_article('http://www.jdlingyu.moe/27164/')
-    # download_photos('http://www.jdlingyu.moe/wp-content/uploads/2016/02/2017-03-30_19-38-31.jpg')
-    # [download_photos(get_photos_by_article(a_url)) for a_url in articles]
+def write_articles_file(articles):
+    with open('articles.txt', 'w') as file_object:
+        file_object.writelines([article + '\n' for article in articles])
 
-    for a in get_all_articles():
+
+def read_articles_file():
+    with open('articles.txt', 'r') as file_object:
+        articles = file_object.readlines()
+        return [a.strip('\n') for a in articles]
+
+def save_progress(index):
+    with open('progress.txt', 'w') as file_object:
+        file_object.write(str(index))
+
+def load_progress():
+    if not os.path.exists('progress.txt'):
+        return -1
+
+    with open('progress.txt', 'r') as file_object:
+        index = file_object.read()
+        return int(index)
+
+def jdly_hacker():
+    # 读取进度
+    progress = load_progress()
+    a_list = list()
+    # 未开始
+    if -1 == progress:
+        a_list = get_all_articles()
+        write_articles_file(a_list)
+        print('A new job is started.')
+    else:
+        all_a_list = read_articles_file()
+        # 已完成
+        if len(all_a_list) <= progress + 1:
+            print('Job was already done.')
+            return
+        else:
+            a_list = all_a_list[progress + 1:]
+            print('Job is started at %d' % progress + 1)
+
+    article_num = len(a_list)
+    for i, a in enumerate(a_list):
+        print('Visiting article - [%d / %d ]. Article url is %s.' % (i+1, article_num, a))
         for p in get_photos_by_article(a):
             download_photos(p)
+        save_progress(progress+1+i)
+
+    print('Jod is done.')
+
+if __name__ == '__main__':
+
+    jdly_hacker()
