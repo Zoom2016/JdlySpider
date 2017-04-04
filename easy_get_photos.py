@@ -18,21 +18,22 @@ def get_all_articles():
     请求所有文章
     :return:文章列表
     """
-    #抓取首页内容
+
+    # 抓取首页内容
     content = requests.get(url_home, headers=header).content
 
     soup = BeautifulSoup(content, "html.parser")
 
-    #分析总页数
+    # 分析总页数
     page_nums = soup.find_all('a', {'class': 'page-numbers'})
     page_max = int(page_nums[-2].get_text().strip())
-    page_max = 1
+    # page_max = 1
     print(page_max)
     article_list = list()
     for page_index in range(page_max):
         page_url = url_model + '%d' % (page_index + 1)
         content = requests.get(page_url, headers=header).content
-        soup = BeautifulSoup(content,'html.parser')
+        soup = BeautifulSoup(content, 'html.parser')
         post_list = soup.find_all('div', {'class': 'pin-coat'})
         [article_list.append(post.a.get('href')) for post in post_list]
         # time.sleep(2000)
@@ -49,16 +50,18 @@ def get_photos_by_article(article_url):
     content = requests.get(article_url, headers=header).content
 
     soup = BeautifulSoup(content, "html.parser")
-
-
     main_body = soup.find_all('div', {'class': 'main-body'})[0]
-    photos = main_body.p.find_all('a')
+    photos = main_body.find_all('a')
     photo_list = list()
-    [photo_list.append(p.get('href')) for p in photos]
+    [photo_list.append(p.get('href')) if is_pic_url(p.get('href')) else write_log('Invaild picture url.[%s][%s].' % (article_url, p.get('href'))) for p in photos ]
     return photo_list
 
     pass
 
+
+def is_pic_url(url):
+    pic_format = ('.jpg', '.jpeg', '.png')
+    return url[-4:] in pic_format or url[-5:] in pic_format
 
 def download_photos(photo, path=None):
     """
@@ -89,9 +92,11 @@ def read_articles_file():
         articles = file_object.readlines()
         return [a.strip('\n') for a in articles]
 
+
 def save_progress(index):
     with open('progress.txt', 'w') as file_object:
         file_object.write(str(index))
+
 
 def load_progress():
     if not os.path.exists('progress.txt'):
@@ -101,8 +106,16 @@ def load_progress():
         index = file_object.read()
         return int(index)
 
+def write_log(content):
+    with open('error.log', 'a') as file_object:
+        file_object.write(time.strftime('[%Y-%m-%d %H:%M:%S]', time.localtime(time.time())) + content+'\n\r')
+
+
 def jdly_hacker():
     # 读取进度
+    if not os.path.exists(r'jdly'):
+        os.mkdir(r'jdly')
+
     progress = load_progress()
     a_list = list()
     # 未开始
@@ -118,7 +131,7 @@ def jdly_hacker():
             return
         else:
             a_list = all_a_list[progress + 1:]
-            print('Job is started at %d' % progress + 1)
+            print('Job is started at %d' % (progress + 1))
 
     article_num = len(a_list)
     for i, a in enumerate(a_list):
@@ -129,6 +142,12 @@ def jdly_hacker():
 
     print('Jod is done.')
 
-if __name__ == '__main__':
 
-    jdly_hacker()
+if __name__ == '__main__':
+    while True:
+        try:
+            jdly_hacker()
+        except Exception as e:
+            write_log('Except Happened!')
+            print(e)
+            time.sleep(10)
