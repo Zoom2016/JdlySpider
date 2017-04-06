@@ -5,6 +5,7 @@ import time
 import urllib
 import re
 import os
+from urllib.request import HTTPError
 
 __author__ = 'zoom'
 
@@ -62,6 +63,7 @@ def get_photos_by_article(article_url):
 def is_pic_url(url):
     pic_format = ('.jpg', '.jpeg', '.png')
     return url[-4:] in pic_format or url[-5:] in pic_format
+
 
 def download_photos(photo, path=None):
     """
@@ -137,17 +139,24 @@ def jdly_hacker():
     for i, a in enumerate(a_list):
         print('Visiting article - [%d / %d ]. Article url is %s.' % (i+1, article_num, a))
         for p in get_photos_by_article(a):
-            download_photos(p)
+            try:
+                download_photos(p)
+            except HTTPError as f:
+                if f.code == 404:
+                    write_log('Photo is not found! [404] [%s]-[%s].' % (a, p))
+                else:
+                    raise f
         save_progress(progress+1+i)
 
     print('Jod is done.')
 
 
 if __name__ == '__main__':
+    # jdly_hacker()
     while True:
         try:
             jdly_hacker()
-        except Exception as e:
+        except HTTPError as e:
             write_log('Except Happened!')
             print(e)
             time.sleep(10)
